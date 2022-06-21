@@ -20,6 +20,9 @@ public:
     bool append(T* request);
 
 private:
+    /*工作线程运行的函数，它不断从工作队列中取出任务并执行之*/
+    //C++的类成员函数都有一个默认参数 this 指针，而线程调用的时候，限制了只能有一个参数 void* arg，
+    //如果worker不设置成静态在调用的时候会出现this 和arg都给worker 导致错误
     static void* worker(void* arg);
     void run();
 
