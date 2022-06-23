@@ -9,6 +9,9 @@
         "numeric": "cpp",
         "ostream": "cpp",
         "sstream": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "iosfwd": "cpp",
+        "limits": "cpp",
+        "streambuf": "cpp"
     }
 }

@@ -95,7 +95,6 @@ int main(int argc,char* argv[]){
     //循环检测是否有读事件发生
     while(true){
         int number = epoll_wait( epollfd, events, MAX_EVENT_NUMBER, -1 );//events是传出参数，保存有事件的文件描述符（个数为返回值）
-        printf("epollwait exit\n");
         if(number<0&&(errno!=EINTR)){//errno==EINTR是阻塞过程中被信号中断，需要再下一轮重新调用epoll_wait()。
         //epoll_pwait()可以避免上述现象，epoll_pwait()可以让程序安全的等到事件的发生
             printf( "epoll failure\n" );
@@ -109,11 +108,9 @@ int main(int argc,char* argv[]){
         for(int i=0;i<number;++i){
             int sockfd=events[i].data.fd;
             if(sockfd==listenfd){
-                printf("新客户端接入\n");
                 struct sockaddr_in clietn_address;
                 socklen_t clietn_addrlength=sizeof(clietn_address);
                 int connectfd=accept(listenfd,(struct sockaddr*)&clietn_address,&clietn_addrlength);
-                printf("新客户端fd:%d\n",connectfd);
 
                 if(connectfd<0){
                     perror("connect");
@@ -129,7 +126,6 @@ int main(int argc,char* argv[]){
                 //将此http连接放到http用户数组users中
                 //以connectfd作为下标索引，可以比较方便的记录用户连接
                 users[connectfd].init(connectfd,clietn_address);
-                printf("连接已加入监听\n");
             }
 
             //对方异常断开或者错误等事件

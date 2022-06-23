@@ -16,7 +16,8 @@ int setnonblocking(int fd){
 //像epoll中添加需要监听的文件描述符
 void addfd(int epollfd,int fd,bool one_shot){
     struct epoll_event epev;
-    epev.events = EPOLLIN| EPOLLRDHUP;//EPOLLRDHUP表示对端异常断开
+    //epev.events = EPOLLIN| EPOLLRDHUP;//EPOLLRDHUP表示对端异常断开
+    epev.events = EPOLLIN| EPOLLET|EPOLLRDHUP;
     epev.data.fd = fd;
     if(one_shot){
         //防止同一个通信被不同的线程处理(即是是ET模式)
@@ -72,26 +73,27 @@ void http_conn::close_conn() {
 
 //循环读取客户数据，知道没有数据可读或者对方断开连接
 bool http_conn::read() {
-    if(m_read_idx>=READ_BUFFER_SIZE){
-        printf("超过读缓冲区大小\n");
+   if( m_read_idx >= READ_BUFFER_SIZE ) {
         return false;
     }
-
-    int bytes_read=0;
-    while(true){
-        bytes_read=recv(m_sockfd,m_read_buf+m_read_idx,READ_BUFFER_SIZE-m_read_idx,0);
-        if(bytes_read=-1){
-            if(errno==EAGAIN||errno==EWOULDBLOCK){
-                //没有读到数据
+    int bytes_read = 0;
+    while(true) {
+        // 从m_read_buf + m_read_idx索引出开始保存数据，大小是READ_BUFFER_SIZE - m_read_idx
+        // m_sockfd已经设置为非阻塞了
+        bytes_read = recv(m_sockfd, m_read_buf + m_read_idx, READ_BUFFER_SIZE - m_read_idx, 0 );
+        printf("读到数据：\n%s\n",m_read_buf);
+        if (bytes_read == -1) {
+            if( errno == EAGAIN || errno == EWOULDBLOCK ) {
+                // 没有数据
                 break;
             }
+            return false;   
+        } else if (bytes_read == 0) {   // 对方关闭连接
             return false;
-        }else if(bytes_read==0){
-            printf("客户端断开连接\n");
         }
-        m_read_idx+=bytes_read;
+        m_read_idx += bytes_read;
     }
-    printf("读取到了数据：\n %s\n",m_read_buf);
+    //printf("读到数据：\n%s\n",m_read_buf);
     return true;
 }
 
@@ -103,6 +105,7 @@ bool http_conn::write() {
 //线程池的工作线程代码，用于处理HTTP请求
 void http_conn::process() {
     //解析HTTP请求
+
     printf("解析http请求\n");
     //生成响应（之后就可以写入数据了）
 }
