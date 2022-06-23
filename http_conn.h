@@ -28,10 +28,10 @@
 
 class http_conn{
 public:
-    http_conn();
-    ~http_conn();
+    http_conn()=default;
+    ~http_conn()=default;
 
-    void init(int sockfd, const sockaddr_in& addr); // 初始化新接受的连接
+    void init(int sockfd, const sockaddr_in& addr); // 初始化新接受的客户端连接
     void close_conn();  // 关闭连接
     void process(); // 处理客户端请求
     bool read();// 非阻塞读
@@ -44,14 +44,10 @@ public:
     static int m_user_count;//统计用户的数量
 
 private:
-    int m_sockfd;//该HTTP连接的socket和对方的socket地址
+    int m_sockfd;//本机中用于和该HTTP连接的socket文件描述符
+    sockaddr_in m_address;//该HTTP连接对方的socket地址
 
 };
-
-
-
-
-
 
 
 #endif

@@ -12,10 +12,12 @@
 #include"http_conn.h"
 #include<assert.h>
 
-#define MAX_FD 65535 //最大的文件描述符个数
-#define MAX_EVENT_NUMBER 10000 // 监听的最大事件的数量
+#define MAX_FD 65535 //最大的文件描述符个数（http最大连接数）
+#define MAX_EVENT_NUMBER 10000 // epoll监听的最大事件的数量
 
 extern void addfd( int epollfd, int fd, bool one_shot );
+extern void removefd(int epollfd,int fd);
+extern void modfd(int epollfd,int fd,int ev);
 
 
 
@@ -87,12 +89,14 @@ int main(int argc,char* argv[]){
     epoll_event events[MAX_EVENT_NUMBER];
     int epollfd=epoll_create(5);//5这个数字没有意义，大于0就行
     //添加到epoll实例中
-    addfd(epollfd,listenfd,false);
+    addfd(epollfd,listenfd,false);//监听的文件描述符不需要设置EPOLLONESHOT
     http_conn::m_epollfd=epollfd;
 
+    //循环检测是否有读事件发生
     while(true){
-        int number = epoll_wait( epollfd, events, MAX_EVENT_NUMBER, -1 );
-        if(number<0&&(errno!=EINTR)){
+        int number = epoll_wait( epollfd, events, MAX_EVENT_NUMBER, -1 );//events是传出参数，保存有事件的文件描述符（个数为返回值）
+        if(number<0&&(errno!=EINTR)){//errno==EINTR是阻塞过程中被信号中断，需要再下一轮重新调用epoll_wait()。
+        //epoll_pwait()可以避免上述现象，epoll_pwait()可以让程序安全的等到事件的发生
             printf( "epoll failure\n" );
             break;
         }
@@ -113,17 +117,44 @@ int main(int argc,char* argv[]){
                     continue;
                 }
 
+                //目前连接数满了
                 if(http_conn::m_user_count>=MAX_FD){
+                    //可以给客户端写一个信息：服务器内部正忙.
                     close(connectfd);
                     continue;
                 }
-
+                //将此http连接放到http用户数组users中
+                //以connectfd作为下标索引，可以比较方便的记录用户连接
                 users[connectfd].init(connectfd,clietn_address);
+            }
+
+            //对方异常断开或者错误等事件
+            else if(events[i].events&( EPOLLRDHUP | EPOLLHUP | EPOLLERR )){
+                users[sockfd].close_conn();//关闭此http连接
+            }
+
+            //已连接的客户端有新的读事件
+            else if(events[i].events & EPOLLIN){
+                if(users[sockfd].read()){//read是一次性读完所有数据
+                    printf("检测到读事件\n");
+                    pool->append(users+sockfd);//将此连接任务添加到线程池处理
+                }else{
+                    users[sockfd].close_conn();
+                }
+            }
+
+            //已连接的客户端有新的写事件
+            else if( events[i].events & EPOLLOUT ) {
+                if( !users[sockfd].write() ) {//wirte是一次性写完所有数据
+                    users[sockfd].close_conn();
+                }
 
             }
-        }
 
+        }
     }
+
+
     close(epollfd);
     close(listenfd);
     delete [] users;

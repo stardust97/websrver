@@ -17,6 +17,7 @@ public:
     /*thread_number是线程池中线程的数量，max_requests是请求队列中最多允许的、等待处理的请求的数量*/
     threadpool(int thread_numer=8,int max_requests=10000);
     ~threadpool(); 
+    //将任务添加到线程池处理
     bool append(T* request);
 
 private:
@@ -51,7 +52,7 @@ private:
 
 template<typename T>
 threadpool<T>::threadpool(int thread_numer,int max_requests):
-    m_thread_numer(threads),m_max_requests(max_requests),
+    m_thread_numer(thread_numer),m_max_requests(max_requests),
     m_stop(false),m_threads(NULL){
     
     if(m_thread_numer<=0||m_max_requests<=0){
@@ -65,6 +66,7 @@ threadpool<T>::threadpool(int thread_numer,int max_requests):
 
     //创建m_thread_numer个线程，并设置线程分离
     for(int i=0;i<m_thread_numer;++i){
+        printf( "create the %dth thread\n", i);
         if( pthread_create(m_threads+i,NULL,worker,this) !=0){
             delete [] m_threads;
             throw std::exception();
@@ -101,7 +103,7 @@ bool threadpool<T>::append(T* request){
 template<typename T>
 void* threadpool<T>::worker(void* arg){
     threadpool* pool=(threadpool*)arg;
-    pool.run();
+    pool->run();
     return pool;
 }
 
