@@ -70,9 +70,28 @@ void http_conn::close_conn() {
     }
 }
 
-
+//循环读取客户数据，知道没有数据可读或者对方断开连接
 bool http_conn::read() {
-    printf("一次性读完数据\n");
+    if(m_read_idx>=READ_BUFFER_SIZE){
+        printf("超过读缓冲区大小\n");
+        return false;
+    }
+
+    int bytes_read=0;
+    while(true){
+        bytes_read=recv(m_sockfd,m_read_buf+m_read_idx,READ_BUFFER_SIZE-m_read_idx,0);
+        if(bytes_read=-1){
+            if(errno==EAGAIN||errno==EWOULDBLOCK){
+                //没有读到数据
+                break;
+            }
+            return false;
+        }else if(bytes_read==0){
+            printf("客户端断开连接\n");
+        }
+        m_read_idx+=bytes_read;
+    }
+    printf("读取到了数据：\n %s\n",m_read_buf);
     return true;
 }
 
