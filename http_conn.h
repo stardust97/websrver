@@ -43,7 +43,8 @@ public:
     static int m_user_count;//统计用户的数量
     static const int READ_BUFFER_SIZE = 2048;   // 读缓冲区的大小
     static const int WRITE_BUFFER_SIZE = 1024;  // 写缓冲区的大小
-    
+    static const int FILENAME_LEN = 200;        // 文件名的最大长度
+
 
     // HTTP请求方法，这里只支持GET
     enum METHOD {GET = 0, POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT};
@@ -77,17 +78,73 @@ private:
     int m_sockfd;//本机中用于和该HTTP连接的socket文件描述符
     sockaddr_in m_address;//该HTTP连接对方的socket地址
     char m_read_buf[ READ_BUFFER_SIZE ];    // 读缓冲区
-    int m_read_idx;                         // 标识读缓冲区中已经读入的客户端数据的最后一个字节的下一个位置
 
+    //标识读缓冲区中已经读入的客户端数据的最后一个字节的下一个位置，也就是缓冲区有效数据的长度
+    int m_read_idx;   
+    
+    int m_checked_index;//当前正在分析的字符在读缓冲区中的位置
+    int m_start_line;  // 当前正在解析的行的起始位置
 
+    CHECK_STATE m_check_state;              // 主状态机当前所处的状态
+
+    /*以下变量和解析请求报文有关*/
+    char* m_version;                        // HTTP协议版本号，我们仅支持HTTP1.1
+    METHOD m_method;                        // 请求方法
+    char* m_url;                            // 客户请求的目标文件的文件名
+    char* m_host;                            //主机名
+    bool m_linger;                          //是否启用长连接keep alive
+    int m_content_length;                   // HTTP请求体的消息总长度
+
+    /*以下变量和响应请求有关*/
+    char m_real_file[ FILENAME_LEN ];       // 客户请求的目标文件的完整路径，其内容等于 doc_root + m_url, doc_root是网站根目录
+    struct stat m_file_stat;                // 目标文件的状态。通过它我们可以判断文件是否存在、是否为目录、是否可读，并获取文件大小等信息
+    char* m_file_address;                   // 客户请求的目标文件被mmap到内存中的起始位置
+    
+    //m_iv[0]用于发送响应报文的响应行与响应头部，m_iv[1]用于发送响应报文需求的资源文件（响应体）
+    struct iovec m_iv[2];                   // 我们将采用writev来执行写操作，所以定义下面两个成员，其中m_iv_count表示被写内存块的数量。
+    int m_iv_count;
+
+    char m_write_buf[ WRITE_BUFFER_SIZE ];  // 写缓冲区
+    int m_write_idx;                        // 写缓冲区中待发送的字节数
+    int bytes_to_send;              // 将要发送的数据的字节数
+    int bytes_have_send;            // 已经发送的字节数
+    
 private:
+    //初始化其他的连接信息
+    void init();
+
+    /*以下函数用于解析http请求*/
     // 下面这一组函数被process_read调用以分析HTTP请求
-    HTTP_CODE parse_request_line( char* text );
-    HTTP_CODE parse_headers( char* text );
-    HTTP_CODE parse_content( char* text );
-    HTTP_CODE do_request();
+    HTTP_CODE parse_request_line( char* text );//解析请求行
+    HTTP_CODE parse_headers( char* text );//解析请求头部
+    HTTP_CODE parse_content( char* text );//解析请求体
+    HTTP_CODE do_request();//根据不同的请求具体相应请求
+
+    //因为缓冲区一次性读完请求报文，没有行的概念（要通过\r\n手动分行，每分一次行，m_start_line位置都会变）
+    //获取当前解析的行的地址，即缓冲区起始地址加m_start_line位置
     char* get_line() { return m_read_buf + m_start_line; }
+
+    //获取一行，交给前三个解析函数处理
     LINE_STATUS parse_line();
+    HTTP_CODE process_read();
+    
+
+    /*以下函数用于相应http请求*/
+    bool add_response( const char* format, ... );
+    bool add_status_line( int status, const char* title );
+    bool add_headers(int content_len);
+    bool add_content_length(int content_len);
+    bool add_linger();
+    bool add_blank_line();
+    bool add_content( const char* content );
+    bool add_content_type();
+
+    // 往写缓冲中写入待发送的数据
+    bool process_write(HTTP_CODE ret);
+    void unmap();
+
+
+
 };
 
 

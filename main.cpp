@@ -137,7 +137,7 @@ int main(int argc,char* argv[]){
             else if(events[i].events & EPOLLIN){
                 if(users[sockfd].read()){//read是一次性读完所有数据
                     printf("检测到读事件\n");
-                    pool->append(users+sockfd);//将此连接任务添加到线程池处理
+                    pool->append(users+sockfd);//将此http连接任务添加到线程池处理
                 }else{
                     users[sockfd].close_conn();
                 }
