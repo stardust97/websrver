@@ -68,7 +68,7 @@ void cb_func( client_data* user_data)
     epoll_ctl( epollfd, EPOLL_CTL_DEL, user_data->sockfd, 0 );
     assert( user_data );
     close( user_data->sockfd );
-    printf( "close fd %d\n", user_data->sockfd );
+    //printf( "close fd %d\n", user_data->sockfd );
 }
 
 void timer_handler()
@@ -243,11 +243,11 @@ int main(int argc,char* argv[]){
                 util_timer* timer = usersinfo[sockfd].timer;
 
                 if(users[sockfd].read()){//read是一次性读完所有数据
-                    printf("检测到读事件\n");
+                    //printf("检测到读事件\n");
                     if( timer ) {
                         time_t cur = time( NULL );
                         timer->expire = cur + 3 * TIMESLOT;
-                        printf( "adjust timer once\n" );
+                        //printf( "adjust timer once\n" );
                         timer_lst.adjust_timer( timer );
                     }
                     pool->append(users+sockfd);//将此http连接任务添加到线程池处理
