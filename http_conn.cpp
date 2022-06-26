@@ -19,7 +19,6 @@ const char* error_500_form = "There was an unusual problem serving the requested
 // 网站的根目录
 const char* doc_root = "/home/tiancheng/webserver/resources";
 
-
 //设置文件描述符为非阻塞
 int setnonblocking(int fd){
     int old_option = fcntl( fd, F_GETFL );//F_GETFL 获取文件状态标志
@@ -28,7 +27,7 @@ int setnonblocking(int fd){
     return old_option;
 }
 
-//像epoll中添加需要监听的文件描述符
+//使用LT模式向epoll中添加需要监听的文件描述符
 void addfd(int epollfd,int fd,bool one_shot){
     struct epoll_event epev;
     epev.events = EPOLLIN| EPOLLRDHUP;//EPOLLRDHUP表示对端异常断开
@@ -42,9 +41,17 @@ void addfd(int epollfd,int fd,bool one_shot){
     //ET模式只在socket描述符状态发生变化时才触发事件，如果不一次把socket内核缓冲区的数据读完，
     //会导致socket内核缓冲区中即使还有一部分数据，该socket的可读事件也不会被触发
     //若ET模式下使用阻塞IO，则程序一定会阻塞在最后一次write或read操作，因此说ET模式下一定要使用非阻塞IO
-
     setnonblocking(fd);
+}
 
+//使用ET模式epoll
+void addfd(int epollfd, int fd )
+{
+    epoll_event event;
+    event.data.fd = fd;
+    event.events = EPOLLIN | EPOLLET;
+    epoll_ctl( epollfd, EPOLL_CTL_ADD, fd, &event );
+    setnonblocking( fd );
 }
 
 //从epoll中移除监听的文件描述符
@@ -111,7 +118,7 @@ void http_conn::close_conn() {
 
 //循环读取客户数据，知道没有数据可读或者对方断开连接
 bool http_conn::read() {
-   if( m_read_idx >= READ_BUFFER_SIZE ) {
+    if( m_read_idx >= READ_BUFFER_SIZE ) {
         return false;
     }
     int bytes_read = 0;
@@ -370,7 +377,6 @@ http_conn::HTTP_CODE http_conn:: process_read(){
 //解析HTTP请求行，包括请求方法，目标URL,HTTP版本
 http_conn::HTTP_CODE http_conn::parse_request_line( char* text ){
     //请求行的格式： GET /index.html HTTP/1.1
-
     //char* strpbrk（str1,str2）依次检验字符串 str1 中的字符，
     //当被检验字符在字符串 str2 中也包含时，则停止检验，并返回该字符位置,未找到返回NULL
     m_url = strpbrk(text, " \t"); // 判断第二个参数中的字符哪个在text中最先出现
@@ -470,6 +476,8 @@ http_conn::HTTP_CODE http_conn::do_request(){
     // "/home/tiancheng/webserver/resources"
     strcpy( m_real_file, doc_root );
     int len = strlen( doc_root );
+    //url为空进入首页 if(m_url=="/")
+    
     strncpy( m_real_file + len, m_url, FILENAME_LEN - len - 1 );
     // 获取m_real_file文件的相关的状态信息，-1失败，0成功
     if ( stat( m_real_file, &m_file_stat ) < 0 ) {//m_file_stat是传出参数，保存了文件的状态信息
