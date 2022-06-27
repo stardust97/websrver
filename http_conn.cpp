@@ -16,7 +16,6 @@ const char* error_404_form = "The requested file was not found on this server.\n
 const char* error_500_title = "Internal Error";
 const char* error_500_form = "There was an unusual problem serving the requested file.\n";
 
-// 网站的根目录
 const char* doc_root = "/home/tiancheng/webserver/resources";
 
 //设置文件描述符为非阻塞
@@ -549,14 +548,14 @@ http_conn::LINE_STATUS http_conn::parse_line(){
 
 //线程池的工作线程代码，用于处理HTTP请求
 void http_conn::process() {
-    //解析HTTP请求
+    //解析HTTP请求,此时请求已经由主线程读到了读缓冲区
     HTTP_CODE read_ret= process_read();
     if ( read_ret == NO_REQUEST ) {
         modfd( m_epollfd, m_sockfd, EPOLLIN );
         return;
     }
 
-    // 生成响应
+    // 生成响应，将数据写入写缓冲区，之后交个主线程发送给客户端
     bool write_ret = process_write( read_ret );
     if ( !write_ret ) {
         close_conn();

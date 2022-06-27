@@ -12,11 +12,8 @@
 #include"http_conn.h"
 #include<assert.h>
 #include"lst_timer.h"
-
-#define MAX_FD 65535 //最大的文件描述符个数（http最大连接数）
-#define MAX_EVENT_NUMBER 10000 // epoll监听的最大事件的数量
-#define TIMESLOT 5
-
+#include"log.h"
+#include"webserver.h"
 
 extern void addfd( int epollfd, int fd, bool one_shot );
 void addfd(int epollfd, int fd );
@@ -99,6 +96,10 @@ int main(int argc,char* argv[]){
 
     //创建http客户端连接用户的数组
     http_conn* users=new http_conn[MAX_FD];
+
+    //初始化日志系统
+    Log::get_instance()->init("./ServerLog", 0, 2000, 800000, 800);//close_lo=0
+
 
     /*配置客户端socket*/
     // 创建监听socket

@@ -78,6 +78,8 @@ public:
 private:
     int m_sockfd;//本机中用于和该HTTP连接的socket文件描述符
     sockaddr_in m_address;//该HTTP连接对方的socket地址
+
+
     char m_read_buf[ READ_BUFFER_SIZE ];    // 读缓冲区
 
     //标识读缓冲区中已经读入的客户端数据的最后一个字节的下一个位置，也就是缓冲区有效数据的长度
