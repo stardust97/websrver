@@ -26,6 +26,10 @@
 #include <sys/uio.h>
 #include <unistd.h>
 #include"lst_timer.h"
+#include"sqlpool.h"
+#include<unordered_map>
+#include<map>
+#include<mysql/mysql.h>
 
 class http_conn{
 public:
@@ -37,6 +41,7 @@ public:
     void process(); // 处理客户端请求
     bool read();// 非阻塞读
     bool write();// 非阻塞写
+    void initmysql_result(connection_pool *connPool);
 
 
 public:
@@ -74,6 +79,8 @@ public:
     // 从状态机的三种可能状态，即行的读取状态，分别表示
     // 1.读取到一个完整的行 2.行出错 3.行数据尚且不完整
     enum LINE_STATUS { LINE_OK = 0, LINE_BAD, LINE_OPEN };
+    
+    MYSQL *mysql;
 
 private:
     int m_sockfd;//本机中用于和该HTTP连接的socket文件描述符
@@ -112,6 +119,12 @@ private:
     int bytes_to_send;              // 将要发送的数据的字节数
     int bytes_have_send;            // 已经发送的字节数
     
+    int m_close_log;
+
+    map<string, string> m_users; //保存用户名与密码
+    char sql_user[100];
+    char sql_passwd[100];
+    char sql_name[100];
 private:
     //初始化其他的连接信息
     void init();
@@ -145,7 +158,6 @@ private:
     // 往写缓冲中写入待发送的数据
     bool process_write(HTTP_CODE ret);
     void unmap();
-
 
 
 };

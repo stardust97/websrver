@@ -18,6 +18,7 @@ const char* error_500_form = "There was an unusual problem serving the requested
 
 const char* doc_root = "/home/tiancheng/webserver/resources";
 
+
 //设置文件描述符为非阻塞
 int setnonblocking(int fd){
     int old_option = fcntl( fd, F_GETFL );//F_GETFL 获取文件状态标志
@@ -114,6 +115,38 @@ void http_conn::close_conn() {
         m_user_count--; // 关闭一个连接，将客户总数量-1
     }
 }
+
+
+void http_conn::initmysql_result(connection_pool *connPool)
+{
+    //先从连接池中取一个连接
+    MYSQL *mysql = NULL;
+    connectionRAII mysqlcon(&mysql, connPool);
+
+    //在user表中检索username，passwd数据，浏览器端输入
+    if (mysql_query(mysql, "SELECT username,passwd FROM user"))//获取数据库用户名和密码
+    {
+        LOG_ERROR("SELECT error:%s\n", mysql_error(mysql));
+    }
+
+    //从表中检索后，保存到结果集
+    MYSQL_RES *result = mysql_store_result(mysql);
+
+    //返回结果集中的列数
+    int num_fields = mysql_num_fields(result);
+
+    //返回所有字段结构的数组
+    MYSQL_FIELD *fields = mysql_fetch_fields(result);
+
+    //从结果集中获取下一行，将对应的用户名和密码，存入哈希表中
+    while (MYSQL_ROW row = mysql_fetch_row(result))//检索结果集的下一行
+    {
+        string temp1(row[0]);
+        string temp2(row[1]);
+        users[temp1] = temp2;
+    }
+}
+
 
 //循环读取客户数据，知道没有数据可读或者对方断开连接
 bool http_conn::read() {
@@ -388,38 +421,47 @@ http_conn::HTTP_CODE http_conn::parse_request_line( char* text ){
     // strcasecmp()忽略大小写比较
     if ( strcasecmp(method, "GET") == 0 ) { 
         m_method = GET;
-    } else {
+    } else if(strcasecmp(method, "POST") == 0){
+        m_method = POST;
+    }else {
         return BAD_REQUEST;
     }
 
-    // /index.html HTTP/1.1
-    m_version = strpbrk( m_url, " \t" );
-    if (!m_version) {
-        return BAD_REQUEST;
-    }
-    *m_version++ = '\0';    // /index.html\0HTTP/1.1
-    // \r\n已经被parse_line置为\0\0了，所以可以从m_version直接比较版本"HTTP/1.1"
-    if (strcasecmp( m_version, "HTTP/1.1") != 0 ) {
-        return BAD_REQUEST;
-    }
+    if(method==GET){
+        // /index.html HTTP/1.1
+        m_version = strpbrk( m_url, " \t" );
+        if (!m_version) {
+            return BAD_REQUEST;
+        }
+        *m_version++ = '\0';    // /index.html\0HTTP/1.1
+        // \r\n已经被parse_line置为\0\0了，所以可以从m_version直接比较版本"HTTP/1.1"
+        if (strcasecmp( m_version, "HTTP/1.1") != 0 ) {
+            return BAD_REQUEST;
+        }
 
-    /** url请求格式
-     * http://192.168.110.129:10000/index.html
-    */
-   //strncasecmp和strcasecmp不同之处在于只比较n个字符
-    if (strncasecmp(m_url, "http://", 7) == 0 ) {   
-        m_url += 7;
-        // char *strchr(const char *str, int c) 在str中搜索第一次出现字符 c的位置
-        m_url = strchr( m_url, '/' );//  index.html
-    }
+        /** url请求格式
+         * http://192.168.110.129:10000/index.html
+        */
+    //strncasecmp和strcasecmp不同之处在于只比较n个字符
+        if (strncasecmp(m_url, "http://", 7) == 0 ) {   
+            m_url += 7;
+            // char *strchr(const char *str, int c) 在str中搜索第一次出现字符 c的位置
+            m_url = strchr( m_url, '/' );//  index.html
+        }
 
-    if ( !m_url || m_url[0] != '/' ) {
-        return BAD_REQUEST;
-    }
+        if ( !m_url || m_url[0] != '/' ) {
+            return BAD_REQUEST;
+        }
 
+    }
+    else if(method==POST){
+        printf("暂时没有实现post请求的解析\n");
+    }
+    
     m_check_state = CHECK_STATE_HEADER; // 主状态机状态变化
     return NO_REQUEST;//还需要继续解析请求头部请求体等，所以返回NO_REQUEST，只有全部解析完成才返回GET_REQUEST
 
+    
 }
 
 // 解析HTTP请求的一个头部信息
@@ -465,6 +507,8 @@ http_conn::HTTP_CODE http_conn::parse_content( char* text ){
         text[ m_content_length ] = '\0';
         return GET_REQUEST;
     }
+    /*post请求需要解析请求体*/
+
     return NO_REQUEST;//报文不完整
 }
 
